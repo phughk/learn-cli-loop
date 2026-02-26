@@ -1,0 +1,115 @@
+WS = _{ " " | "\t" | "\n" | "\r" }
+
+INT = _{ [0-9]+ }
+
+# Primary values that can be assigned or queried
+STRING_LITERAL = { "\"" ( !"\\" | "\\" . )* "\"" }
+QUOTED_STRING = { STRING_LITERAL | "'" ( !"\\" | "\\" . )* "'" }
+
+# Identifier/keywords
+KEYWORD = { "SELECT" | "INSERT" | "UPDATE" | "DELETE" | "FROM" | "WHERE" | "SET" | "VALUES" }
+
+# The main entry point
+QUERY = { statement !WS }
+
+# Database query statement
+statement = {
+    select_statement |
+    insert_statement |
+    update_statement |
+    delete_statement
+}
+
+# SELECT statement
+select_statement = {
+    "SELECT" " "* columns " "* "FROM" " "* table_name " "* 
+    [ "WHERE" " "* condition ]?
+    " "* [ "LIMIT" " "* INT ]?
+}
+
+# Column specification (single column or * wildcard)
+col_spec = { column_name | "("* " "* " "* " "* ")" }
+
+# Table name (simple identifier)
+table_name = { identifier }
+
+# Condition for WHERE clause
+condition = {
+    logical_and
+}
+
+# Simple condition: column = value or column = ?
+simple_condition = { logical_or }
+
+logical_and = { logical_expr ( " " "AND" " " logical_expr )* }
+logical_or = { logical_expr ( " " "OR" " " logical_expr )* }
+
+logical_expr = { comparison_expr }
+
+comparison_expr = {
+    add_expr (" " "=" | " " "<>" | " " "<" | " " ">" | " " "<=" | " " ">=" | " " "LIKE" ) " "* compare_value
+}
+
+# Addition and subtraction in comparisons
+add_expr = { mul_expr ( " " ("+" | "-") " "* mul_expr )* }
+
+# Multiplication and division
+mul_expr = { unary_expr ( " " ("*" | "/") " "* unary_expr )* }
+
+# Unary operators (NOT)
+unary_expr = { " "+"NOT" " "* factor }
+
+# Primary values in expressions
+factor = {
+    literal_value |
+    column_name
+}
+
+# Various types of values
+literal_value = { 
+    INT |
+    STRING_LITERAL |
+    QUOTED_STRING |
+    QUESTION_MARK
+}
+
+# Parameter placeholder
+QUESTION_MARK = { "?" }
+
+column_name = { identifier }
+
+# INSERT statement
+insert_statement = {
+    "INSERT" " " "INTO" " "* table_name " "* 
+    "VALUES" " "* "("* " "* value_list " "* ")" " "* 
+    [ "WHERE" " "* condition ]?
+}
+
+# Comma-separated list of values
+value_list = { value ( " "* "," " "* value )* }
+
+# Single value
+value = {
+    literal_value
+}
+
+# UPDATE statement
+update_statement = {
+    "UPDATE" " "* table_name " "* "SET" " "* updates 
+    [ " " "WHERE" " "* condition ]?
+}
+
+# Comma-separated list of column = ? pairs
+updates = { update_item ( " "* "," " "* update_item )* }
+
+# Single column = ? update
+update_item = { column_name " "=" " "* QUESTION_MARK }
+
+# DELETE statement
+delete_statement = {
+    "DELETE" " "* "FROM" " "* table_name 
+    [ " " "WHERE" " "* condition ]?
+}
+
+# Generic identifier pattern
+identifier = { [a-zA-Z_][a-zA-Z0-9_]* }

@@ -30,14 +30,17 @@ fn main() {
     match &cli.command {
         Commands::Init => {
             println!("Initializing database schema...");
-            db.execute("CREATE TABLE questions (\
+            db.execute(
+                "CREATE TABLE questions (\
                 id INTEGER PRIMARY KEY AUTO_INCREMENT,\
                 question TEXT,\
                 answer TEXT, \
                 correct INTEGER, \
                 attempts INTEGER, \
-                last_checked INTEGER)", ())
-                .expect("Failed to create table");
+                last_checked INTEGER)",
+                (),
+            )
+            .expect("Failed to create table");
             println!("✅ Database initialized successfully.");
         }
         Commands::Manage => {
@@ -52,7 +55,14 @@ fn main() {
 fn run_quiz(db: &Database) {
     let total_questions = {
         let mut count_rows = db.query("SELECT COUNT(*) FROM questions", ()).unwrap();
-        let total: i64 = count_rows.next().unwrap().ok().unwrap().get(0).ok().unwrap();
+        let total: i64 = count_rows
+            .next()
+            .unwrap()
+            .ok()
+            .unwrap()
+            .get(0)
+            .ok()
+            .unwrap();
         total
     };
     let mut correct_count = 0u32;
@@ -96,7 +106,6 @@ fn manage_entries(db: &Database) {
             println!("✅ Question added.");
         }
         "2" => {
-            // List questions first so user knows what to delete
             println!("\nExisting Questions:");
             let rows = db.query("SELECT id, question FROM questions", ()).unwrap();
             for row in rows {
@@ -108,11 +117,14 @@ fn manage_entries(db: &Database) {
 
             let id = prompt("\nEnter ID to remove: ");
             if let Ok(id) = id.parse::<i64>() {
-                db.execute("DELETE FROM questions WHERE id = $1", vec![Value::Integer(id)])
-                    .expect("Failed to delete question");
+                db.execute(
+                    "DELETE FROM questions WHERE id = $1",
+                    vec![Value::Integer(id)],
+                )
+                .expect("Failed to delete question");
                 println!("✅ Removed ID {}.", id);
             } else {
-                println!("Done goofed - nan")
+                println!("Invalid selection.")
             }
         }
         _ => println!("Invalid selection."),
@@ -128,17 +140,19 @@ fn prompt(message: &str) -> String {
 }
 
 fn find_question(db: &Database, rng: &mut ChaCha12Rng, total: &i64) -> Question {
-    // Find the total number of questions from database and pick a random question
     let choice = rng.random_range(0..*total);
-    let mut rows = db.query("SELECT id, question, answer FROM questions LIMIT 1 OFFSET $1", vec![Value::Integer(choice)]).unwrap();
+    let mut rows = db
+        .query(
+            "SELECT id, question, answer FROM questions LIMIT 1 OFFSET $1",
+            vec![Value::Integer(choice)],
+        )
+        .unwrap();
 
     let row = rows.next().unwrap().unwrap();
     let id: i64 = row.get(0).unwrap();
     let question: String = row.get(1).unwrap();
     let answer: String = row.get(2).unwrap();
 
-
-    // Placeholder as requested
     Question {
         id,
         question,
@@ -153,19 +167,14 @@ pub struct Question {
 }
 
 pub struct Answer {
-    /// After trim, lowercase
     pub processed: String,
     pub correct: bool,
 }
 
-fn read_and_check_answer(q: &Question) -> Answer{
+fn read_and_check_answer(q: &Question) -> Answer {
     let mut input = String::new();
+    stdin().read_line(&mut input).expect("Failed to read line");
 
-    stdin()
-        .read_line(&mut input)
-        .expect("Failed to read line");
-
-    // Process: trim whitespace/newlines and convert to lowercase for case-insensitive matching
     let processed = input.trim().to_lowercase();
     let is_correct = processed == q.answer.trim().to_lowercase();
 
@@ -183,7 +192,6 @@ fn update_database(db: &Database, q: &Question, answer: &Answer) {
 
     let increment_correct = if answer.correct { 1 } else { 0 };
 
-    // Update the row: increment attempts, optionally increment correct, and set timestamp
     db.execute(
         "UPDATE questions \
          SET attempts = attempts + 1, \
@@ -195,5 +203,6 @@ fn update_database(db: &Database, q: &Question, answer: &Answer) {
             Value::Integer(now),
             Value::Integer(q.id),
         ],
-    ).expect("Failed to update database metrics");
+    )
+    .expect("Failed to update database metrics");
 }
